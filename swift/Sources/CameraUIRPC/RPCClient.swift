@@ -36,6 +36,29 @@ public struct RPCClientOptions: Sendable {
   }
 }
 
+/// Connection lifecycle events, mirroring the node client's `status()`
+/// iterator and the python client's `reconnected_cb`. A `connected` following
+/// a `disconnected` is a completed reconnect; nats.swift restores all
+/// subscriptions itself before emitting it.
+public enum RPCConnectionEvent: String, Sendable {
+  case connected
+  case disconnected
+  case suspended
+  case closed
+}
+
+extension RPCConnectionEvent {
+  fileprivate init?(_ event: NatsEvent) {
+    switch event {
+    case .connected: self = .connected
+    case .disconnected: self = .disconnected
+    case .suspended: self = .suspended
+    case .closed: self = .closed
+    default: return nil
+    }
+  }
+}
+
 public actor RPCClient {
   private let options: RPCClientOptions
   private var nats: NatsClient?
@@ -44,6 +67,7 @@ public actor RPCClient {
   private var assemblers: [String: ChunkAssembler] = [:]
   private var statusHandlers: [String: @Sendable () -> Void] = [:]
   private var iteratorSettles: [String: @Sendable () -> Void] = [:]
+  private var eventContinuations: [UUID: AsyncStream<RPCConnectionEvent>.Continuation] = [:]
   private var counter: UInt64 = 0
 
   public init(options: RPCClientOptions) {
@@ -75,6 +99,11 @@ public actor RPCClient {
     try await client.connect()
     nats = client
 
+    client.on([.connected, .disconnected, .suspended, .closed]) { [weak self] event in
+      guard let self, let mapped = RPCConnectionEvent(event) else { return }
+      Task { await self.broadcast(mapped) }
+    }
+
     // one muxed inbox for all replies, routed by envelope id
     let replies = try await client.subscribe(subject: "rpc.reply.\(options.connId).>")
     replyTask = Task { [weak self] in
@@ -94,6 +123,34 @@ public actor RPCClient {
     try? await nats?.close()
     nats = nil
     failAllPending(RPCClientError.notConnected)
+    let continuations = eventContinuations
+    eventContinuations = [:]
+    for continuation in continuations.values {
+      continuation.yield(.closed)
+      continuation.finish()
+    }
+  }
+
+  /// Streams connection lifecycle events until the client closes. Multiple
+  /// streams can be open at once; each terminates with a final `closed`.
+  public func statusEvents() -> AsyncStream<RPCConnectionEvent> {
+    let id = UUID()
+    return AsyncStream { continuation in
+      continuation.onTermination = { [weak self] _ in
+        Task { await self?.removeEventContinuation(id) }
+      }
+      eventContinuations[id] = continuation
+    }
+  }
+
+  private func broadcast(_ event: RPCConnectionEvent) {
+    for continuation in eventContinuations.values {
+      continuation.yield(event)
+    }
+  }
+
+  private func removeEventContinuation(_ id: UUID) {
+    eventContinuations.removeValue(forKey: id)
   }
 
   public func call(

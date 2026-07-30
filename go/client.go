@@ -80,6 +80,10 @@ type Client struct {
 
 	pullIteratorCleanups sync.Map // map[string]func()
 	callbackCleanups     sync.Map // map[string]func()
+
+	reconnectMu       sync.Mutex
+	reconnectSeq      int
+	reconnectHandlers map[int]func()
 }
 
 type pendingRequest struct {
@@ -178,6 +182,7 @@ func (c *Client) Connect(ctx context.Context) error {
 	natsOpts := []nats.Option{
 		nats.Name(c.Options.Name),
 		nats.ReconnectWait(c.Options.ReconnectWait),
+		nats.ReconnectHandler(func(*nats.Conn) { c.notifyReconnect() }),
 	}
 
 	if c.Options.Reconnect {
@@ -831,6 +836,46 @@ func (c *Client) requestOnce(ctx context.Context, subject string, data any, time
 	}
 
 	return msg.Data, nil
+}
+
+// OnReconnect registers fn to run after the connection is re-established.
+// Subscriptions survive a reconnect, but messages published while the link was
+// down are lost, so a consumer that caches server state uses this to resync.
+// Returns a function that unregisters the handler.
+//
+// Handlers run on their own goroutine, so a slow one does not stall the NATS
+// reconnect path, and a panicking one does not take the process down.
+func (c *Client) OnReconnect(fn func()) func() {
+	c.reconnectMu.Lock()
+	if c.reconnectHandlers == nil {
+		c.reconnectHandlers = make(map[int]func())
+	}
+	c.reconnectSeq++
+	id := c.reconnectSeq
+	c.reconnectHandlers[id] = fn
+	c.reconnectMu.Unlock()
+
+	return func() {
+		c.reconnectMu.Lock()
+		delete(c.reconnectHandlers, id)
+		c.reconnectMu.Unlock()
+	}
+}
+
+func (c *Client) notifyReconnect() {
+	c.reconnectMu.Lock()
+	handlers := make([]func(), 0, len(c.reconnectHandlers))
+	for _, fn := range c.reconnectHandlers {
+		handlers = append(handlers, fn)
+	}
+	c.reconnectMu.Unlock()
+
+	for _, fn := range handlers {
+		go func() {
+			defer func() { _ = recover() }()
+			fn()
+		}()
+	}
 }
 
 // OnRequest registers a handler for native NATS request/reply on the given

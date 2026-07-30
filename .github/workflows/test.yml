@@ -12,6 +12,9 @@ on:
       go:
         type: boolean
         default: true
+      swift:
+        type: boolean
+        default: true
       integration:
         type: boolean
         default: true
@@ -93,11 +96,37 @@ jobs:
       - name: Unit tests
         run: cd go && go test ./...
 
+  swift:
+    if: ${{ inputs.swift }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+      - uses: actions/cache@v4
+        with:
+          path: swift/.build
+          key: swift-${{ runner.os }}-${{ hashFiles('swift/Package.resolved') }}
+          restore-keys: swift-${{ runner.os }}-
+
+      - name: Build
+        run: cd swift && swift build
+
+      - name: Unit tests
+        run: cd swift && swift test
+
   integration:
     if: ${{ inputs.integration }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: true
+      - uses: actions/cache@v4
+        with:
+          path: swift/.build
+          key: swift-release-${{ runner.os }}-${{ hashFiles('swift/Package.resolved') }}
+          restore-keys: swift-release-${{ runner.os }}-
       - uses: actions/setup-node@v7
         with:
           node-version: "22"

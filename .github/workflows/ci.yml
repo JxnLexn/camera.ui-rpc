@@ -22,6 +22,7 @@ jobs:
       node: ${{ steps.filter.outputs.node }}
       python: ${{ steps.filter.outputs.python }}
       go: ${{ steps.filter.outputs.go }}
+      swift: ${{ steps.filter.outputs.swift }}
       tests: ${{ steps.filter.outputs.tests }}
     steps:
       - uses: actions/checkout@v7
@@ -48,6 +49,10 @@ jobs:
               - '.golangci.yml'
               - 'package.json'
               - '.github/workflows/**'
+            swift:
+              - 'swift/**'
+              - '.gitmodules'
+              - '.github/workflows/**'
             tests:
               - 'tests/**'
               - 'package.json'
@@ -60,4 +65,5 @@ jobs:
       node: ${{ needs.changes.outputs.node == 'true' }}
       python: ${{ needs.changes.outputs.python == 'true' }}
       go: ${{ needs.changes.outputs.go == 'true' }}
-      integration: ${{ needs.changes.outputs.node == 'true' || needs.changes.outputs.python == 'true' || needs.changes.outputs.go == 'true' || needs.changes.outputs.tests == 'true' }}
+      swift: ${{ needs.changes.outputs.swift == 'true' }}
+      integration: ${{ needs.changes.outputs.node == 'true' || needs.changes.outputs.python == 'true' || needs.changes.outputs.go == 'true' || needs.changes.outputs.swift == 'true' || needs.changes.outputs.tests == 'true' }}

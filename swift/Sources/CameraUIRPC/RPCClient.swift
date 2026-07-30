@@ -53,10 +53,11 @@ public actor RPCClient {
   public func connect() async throws {
     guard nats == nil else { return }
 
+    // no maxReconnects: nil means infinite auto-reconnect in nats.swift
+    // (-1 would disable reconnecting entirely, the loop checks attempts < max)
     var natsOptions = NatsClientOptions()
       .url(options.url)
       .reconnectWait(1)
-      .maxReconnects(-1)
     if let username = options.username, let password = options.password {
       natsOptions = natsOptions.usernameAndPassword(username, password)
     }

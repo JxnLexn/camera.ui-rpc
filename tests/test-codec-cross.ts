@@ -224,6 +224,7 @@ function runCrossTest(sourceName: string, pathPattern: string): { passed: number
 const results = [
   runCrossTest('Python', '/tmp/py-encoded-%s.msgpack'),
   runCrossTest('Go', '/tmp/go-encoded-%s.msgpack'),
+  runCrossTest('Swift', '/tmp/swift-encoded-%s.msgpack'),
 ];
 
 console.log();

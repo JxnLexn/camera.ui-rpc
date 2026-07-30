@@ -28,3 +28,4 @@ __pycache__
 tests/nats
 tests/go-codec/go-codec
 tests/go-codec-cross/go-codec-cross
+.build

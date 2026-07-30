@@ -21,6 +21,7 @@ cleanup() {
     rm -f /tmp/py-encoded-*.msgpack
     rm -f /tmp/node-encoded-*.msgpack
     rm -f /tmp/go-encoded-*.msgpack
+    rm -f /tmp/swift-encoded-*.msgpack
 }
 
 trap cleanup EXIT
@@ -67,14 +68,20 @@ run_phase "Node.js encode + roundtrip" \
 run_phase "Go encode + roundtrip + struct decode" \
     "cd '$SCRIPT_DIR' && go run ./go-codec"
 
+run_phase "Swift encode + roundtrip" \
+    "cd '$SCRIPT_DIR/../swift' && swift run -c release codec-test encode"
+
 run_phase "Python cross-decode (Node.js + Go data)" \
     "cd '$SCRIPT_DIR' && python test-codec-cross.py"
 
-run_phase "Node.js cross-decode (Python + Go data)" \
+run_phase "Node.js cross-decode (Python + Go + Swift data)" \
     "cd '$SCRIPT_DIR' && tsx test-codec-cross.ts"
 
 run_phase "Go cross-decode (Python + Node.js data)" \
     "cd '$SCRIPT_DIR' && go run ./go-codec-cross"
+
+run_phase "Swift cross-decode (Python + Node.js + Go data)" \
+    "cd '$SCRIPT_DIR/../swift' && swift run -c release codec-test cross"
 
 echo ""
 echo -e "${CYAN}Summary${NC}"

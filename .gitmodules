@@ -2,3 +2,6 @@
 	path = node/externals/nats.js
 	url = https://github.com/seydx/nats.js.git
 	branch = main
+[submodule "swift/externals/nats.swift"]
+	path = swift/externals/nats.swift
+	url = https://github.com/seydx/nats.swift

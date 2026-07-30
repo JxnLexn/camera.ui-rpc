@@ -241,6 +241,10 @@ class RPCClientOptions(TypedDict):
     """Async callback for NATS transport errors. When omitted, transport errors are
     swallowed (reconnect logic recovers transient failures; shutdown errors are noise)."""
 
+    reconnected_cb: NotRequired[Callback]
+    """Async callback fired after the connection is re-established. Consumers use it
+    to refetch state that was published while the link was down."""
+
 
 class RPCMessage(TypedDict):
     """RPC request message format."""

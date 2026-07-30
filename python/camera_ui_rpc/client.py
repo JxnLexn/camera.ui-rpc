@@ -201,6 +201,9 @@ class RPCClient(RPCClientProtocol):
             "error_cb": self._make_error_cb(),
         }
 
+        if reconnected_cb := self.options.get("reconnected_cb"):
+            connect_opts["reconnected_cb"] = reconnected_cb
+
         # Add auth if provided
         if auth := self.options.get("auth"):
             connect_opts["user"] = auth.get("user")

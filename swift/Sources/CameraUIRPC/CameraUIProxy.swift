@@ -6,7 +6,8 @@ extension RPCClientOptions {
     token: String,
     connId: String = UUID().uuidString,
     pinnedCertificate: URL? = nil,
-    skipHostnameVerification: Bool = false
+    skipHostnameVerification: Bool = false,
+    skipCertificateVerification: Bool = false
   ) -> RPCClientOptions {
     var components = URLComponents(url: serverURL, resolvingAgainstBaseURL: false)!
     let insecure = components.scheme == "http" || components.scheme == "ws"
@@ -26,7 +27,8 @@ extension RPCClientOptions {
       username: "secret",
       password: "secret",
       pinnedCertificate: pinnedCertificate,
-      skipHostnameVerification: skipHostnameVerification
+      skipHostnameVerification: skipHostnameVerification,
+      skipCertificateVerification: skipCertificateVerification
     )
   }
 
@@ -36,14 +38,16 @@ extension RPCClientOptions {
     token: String,
     connId: String = UUID().uuidString,
     pinnedCertificate: URL? = nil,
-    skipHostnameVerification: Bool = false
+    skipHostnameVerification: Bool = false,
+    skipCertificateVerification: Bool = false
   ) -> RPCClientOptions {
     cameraUI(
       serverURL: URL(string: "https://\(host):\(port)")!,
       token: token,
       connId: connId,
       pinnedCertificate: pinnedCertificate,
-      skipHostnameVerification: skipHostnameVerification
+      skipHostnameVerification: skipHostnameVerification,
+      skipCertificateVerification: skipCertificateVerification
     )
   }
 }

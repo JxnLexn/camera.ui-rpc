@@ -9,6 +9,7 @@ public struct RPCClientOptions: Sendable {
   public var password: String?
   public var pinnedCertificate: URL?
   public var skipHostnameVerification: Bool
+  public var skipCertificateVerification: Bool
   public var requestTimeout: TimeInterval
   public var noResponderRetries: Int
 
@@ -19,6 +20,7 @@ public struct RPCClientOptions: Sendable {
     password: String? = nil,
     pinnedCertificate: URL? = nil,
     skipHostnameVerification: Bool = false,
+    skipCertificateVerification: Bool = false,
     requestTimeout: TimeInterval = 15,
     noResponderRetries: Int = 3
   ) {
@@ -28,6 +30,7 @@ public struct RPCClientOptions: Sendable {
     self.password = password
     self.pinnedCertificate = pinnedCertificate
     self.skipHostnameVerification = skipHostnameVerification
+    self.skipCertificateVerification = skipCertificateVerification
     self.requestTimeout = requestTimeout
     self.noResponderRetries = noResponderRetries
   }
@@ -62,6 +65,9 @@ public actor RPCClient {
     }
     if options.skipHostnameVerification {
       natsOptions = natsOptions.noHostnameVerification()
+    }
+    if options.skipCertificateVerification {
+      natsOptions = natsOptions.noCertificateVerification()
     }
 
     let client = natsOptions.build()

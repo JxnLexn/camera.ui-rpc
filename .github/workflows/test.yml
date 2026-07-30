@@ -109,6 +109,10 @@ jobs:
           key: swift-${{ runner.os }}-${{ hashFiles('swift/Package.resolved') }}
           restore-keys: swift-${{ runner.os }}-
 
+      # swift-sodium links the system libsodium on Linux
+      - name: Install libsodium
+        run: sudo apt-get update && sudo apt-get install -y libsodium-dev
+
       - name: Build
         run: cd swift && swift build
 
@@ -136,6 +140,10 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
+
+      # swift-sodium links the system libsodium on Linux
+      - name: Install libsodium
+        run: sudo apt-get update && sudo apt-get install -y libsodium-dev
 
       - name: Install JS dependencies
         run: |

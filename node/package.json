@@ -34,11 +34,11 @@
     "@nats-io/nats-core": "^3.4.0",
     "@nats-io/services": "^3.4.0",
     "@nats-io/transport-node": "^3.4.0",
-    "msgpackr": "^2.0.4",
+    "msgpackr": "^2.0.5",
     "reflect-metadata": "^0.2.2"
   },
   "devDependencies": {
-    "@types/node": "^26.1.1",
+    "@types/node": "^26.1.2",
     "vitest": "^4.1.10"
   },
   "bugs": {

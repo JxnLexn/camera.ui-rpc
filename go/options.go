@@ -52,6 +52,11 @@ type ClientOptions struct {
 	// ReconnectWait is the delay between reconnection attempts (default: 2s).
 	ReconnectWait time.Duration
 
+	// ConnectTimeout bounds a single connection attempt. nats.go defaults to 2s,
+	// which a host name resolving to a dead address first can use up entirely
+	// before the working one is tried (default: 10s).
+	ConnectTimeout time.Duration
+
 	// TLS contains optional TLS configuration.
 	TLS *TLSOptions
 

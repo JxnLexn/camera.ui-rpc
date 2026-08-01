@@ -196,6 +196,9 @@ class RPCClient(RPCClientProtocol):
             "reconnect_time_wait": int(
                 self.options.get("reconnect_time_wait", 2000) / 1000
             ),  # Convert to seconds
+            # nats-py defaults to 2s, which a host name resolving to a dead ::1
+            # first burns entirely before the ipv4 fallback is even tried
+            "connect_timeout": int(self.options.get("connect_timeout", 10000) / 1000),
             # "no_echo": True,  # Don't echo messages back to the client
             "pending_size": 6 * 1024 * 1024,  # 6MB pending buffer
             "error_cb": self._make_error_cb(),

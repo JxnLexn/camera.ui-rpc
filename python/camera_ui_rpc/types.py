@@ -219,6 +219,9 @@ class RPCClientOptions(TypedDict):
     reconnect_time_wait: NotRequired[int]
     """Delay between reconnection attempts in milliseconds"""
 
+    connect_timeout: NotRequired[int]
+    """Timeout for a single connection attempt in milliseconds"""
+
     tls: NotRequired[dict[str, str]]
     """TLS configuration with 'cert', 'key', and 'ca' keys"""
 

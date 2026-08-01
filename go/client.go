@@ -118,6 +118,9 @@ func NewClient(opts ClientOptions) *Client { //nolint:gocritic // opts is copied
 	if opts.ReconnectWait == 0 {
 		opts.ReconnectWait = 2 * time.Second
 	}
+	if opts.ConnectTimeout == 0 {
+		opts.ConnectTimeout = 10 * time.Second
+	}
 	// With a ConnID the prefix MUST be exactly the ConnID — a server-side
 	// firewall may allowlist `rpc.reply.<connId>.>` for such clients.
 	replyPrefix := opts.ConnID
@@ -181,6 +184,7 @@ func (c *Client) Connect(ctx context.Context) error {
 
 	natsOpts := []nats.Option{
 		nats.Name(c.Options.Name),
+		nats.Timeout(c.Options.ConnectTimeout),
 		nats.ReconnectWait(c.Options.ReconnectWait),
 		nats.ReconnectHandler(func(*nats.Conn) { c.notifyReconnect() }),
 	}

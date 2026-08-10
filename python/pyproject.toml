@@ -28,8 +28,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-examples = ["uvloop>=0.21.0"]
-test = ["pytest>=8"]
+examples = ["uvloop>=0.22.1"]
+test = ["pytest>=9.1.1"]
 
 [project.urls]
 Homepage = "https://github.com/cameraui/rpc"

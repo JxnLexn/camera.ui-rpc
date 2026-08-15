@@ -1,6 +1,6 @@
 import type { EndpointInfo, ServiceInfo } from '@nats-io/services';
 import type { RPCClient } from './client.js';
-import type { Promisify } from './types.js';
+import type { Promisify, ProxyTimingReporter } from './types.js';
 
 /**
  * Symbol keys used to mark objects as rpc callback bundles.
@@ -82,7 +82,13 @@ export function isPromise(value: unknown): value is Promise<unknown> {
  * // Optional chaining for unknown methods
  * const result = await service.maybeMethod?.(); // undefined if method doesn't exist
  */
-export function createProxy<T extends object>(client: RPCClient, namespace: string, path: string[] = [], methodCache: Set<string> | null = null): Promisify<T> {
+export function createProxy<T extends object>(
+  client: RPCClient,
+  namespace: string,
+  path: string[] = [],
+  methodCache: Set<string> | null = null,
+  onTiming?: ProxyTimingReporter,
+): Promisify<T> {
   // Shared cache reference that can be updated
   let cache = methodCache;
 
@@ -95,10 +101,13 @@ export function createProxy<T extends object>(client: RPCClient, namespace: stri
   // passed through untouched (no mutation, no spread copy). Discovery is
   // requested only while the cache is empty — once the first response filled
   // it, responses stay lean (no __methods payload).
-  const callAndCache = async (subject: string, args: any[]): Promise<any> => {
-    const { result, methods } = await client.callWithMeta(subject, args, { discover: cache === null });
+  const callAndCache = async (subject: string, args: any[], method?: string): Promise<any> => {
+    const { result, methods, timing } = await client.callWithMeta(subject, args, { discover: cache === null, timing: onTiming !== undefined });
     if (methods) {
       updateCache(methods);
+    }
+    if (timing && onTiming) {
+      onTiming(method ?? subject, timing);
     }
     return result;
   };
@@ -161,7 +170,7 @@ export function createProxy<T extends object>(client: RPCClient, namespace: stri
           } else {
             // Route through the meta channel so __methods feeds the cache
             // without touching the result object.
-            return callAndCache(subject, args);
+            return callAndCache(subject, args, method);
           }
         },
 
@@ -175,14 +184,14 @@ export function createProxy<T extends object>(client: RPCClient, namespace: stri
               if (!client.isConnected && !client.isClosed) {
                 await client.connect();
               }
-              return callAndCache(`rpc.${namespace}.${method}`, []);
+              return callAndCache(`rpc.${namespace}.${method}`, [], method);
             })();
             // @ts-ignore
             return promise[nestedProp as keyof Promise<any>].bind(promise);
           }
 
           // Otherwise, return another proxy for nested access (share cache)
-          return createProxy<any>(client, namespace, fullPath, cache)[nestedProp];
+          return createProxy<any>(client, namespace, fullPath, cache, onTiming)[nestedProp];
         },
       });
     },

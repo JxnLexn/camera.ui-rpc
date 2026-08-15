@@ -271,6 +271,11 @@ class RPCMessage(TypedDict):
     envelope (not in params) so it never leaks into handler arguments; old
     responders ignore it."""
 
+    __timing: NotRequired[bool]
+    """Timing request (internal metadata). When True, the responder stamps its
+    clock around the handler and returns both stamps in ``__timing``. Old
+    responders ignore it and the caller just sees no timing back."""
+
 
 class RPCResponse(TypedDict):
     """RPC response message format."""
@@ -286,6 +291,21 @@ class RPCResponse(TypedDict):
 
     __methods: NotRequired[list[str] | None]
     """Available methods on namespace (internal metadata for proxy)"""
+
+    __timing: NotRequired[RPCTiming | None]
+    """Responder-side clock around the handler, in epoch milliseconds, only
+    when the request asked for it. Both stamps come from the same clock, so
+    their difference carries no offset against the caller's clock."""
+
+
+class RPCTiming(TypedDict):
+    """Responder clock stamps around a handler invocation."""
+
+    start: int
+    """Right before the handler is invoked"""
+
+    end: int
+    """Right after the handler returned"""
 
 
 class RPCError(TypedDict):

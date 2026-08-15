@@ -3,6 +3,7 @@
 import asyncio
 import contextlib
 import ssl
+import time
 import traceback
 from collections.abc import AsyncGenerator, Awaitable, Callable, Coroutine
 from concurrent.futures import ThreadPoolExecutor
@@ -1899,12 +1900,19 @@ class RPCClient(RPCClientProtocol):
                         await client.publish(reply_subject, response)
                     else:
                         # Normal RPC call
+                        wants_timing = message.get("__timing") is True
+                        start = time.time() * 1000 if wants_timing else 0.0
                         result = await handle_normal_rpc(
                             handler,
                             message.get("params", []),
                             client.io_pool,
                             handler_is_async,
                         )
+                        if wants_timing:
+                            response["__timing"] = {
+                                "start": int(start),
+                                "end": int(time.time() * 1000),
+                            }
                         response["result"] = result
 
                         # Send response

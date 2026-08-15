@@ -12,14 +12,26 @@ type RPCMessage struct {
 	Method   string `msgpack:"method"`
 	Params   any    `msgpack:"params"`
 	Discover bool   `msgpack:"__discover,omitempty"`
+	// Timing asks the responder to stamp its clock around the handler and
+	// return both stamps in the response. Old responders ignore it.
+	Timing bool `msgpack:"__timing,omitempty"`
 }
 
 // RPCResponse is the wire-format for an RPC response.
 type RPCResponse struct {
-	ID      string    `msgpack:"id"`
-	Result  any       `msgpack:"result"`
-	Error   *RPCError `msgpack:"error,omitempty"`
-	Methods []string  `msgpack:"__methods,omitempty"`
+	ID      string     `msgpack:"id"`
+	Result  any        `msgpack:"result"`
+	Error   *RPCError  `msgpack:"error,omitempty"`
+	Methods []string   `msgpack:"__methods,omitempty"`
+	Timing  *RPCTiming `msgpack:"__timing,omitempty"`
+}
+
+// RPCTiming carries the responder's clock around a handler invocation, in
+// epoch milliseconds. Both stamps come from the same clock, so their
+// difference is free of any offset against the caller's clock.
+type RPCTiming struct {
+	Start int64 `msgpack:"start"`
+	End   int64 `msgpack:"end"`
 }
 
 // RPCError is the wire-format for an error within an RPC response.

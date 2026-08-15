@@ -24,10 +24,13 @@ import type {
   PullIteratorRequest,
   PullIteratorResponse,
   RPCAuthOptions,
+  RPCCallTiming,
   RPCClient as RPCClientImpl,
   RPCClientOptions,
   RPCMessage,
   RPCResponse,
+  RPCTiming,
+  ProxyTimingReporter,
   StreamMessage,
 } from './types.js';
 
@@ -903,7 +906,7 @@ export class RPCClient implements RPCClientImpl {
     } else {
       // __methods (proxy method discovery) travels as a side channel next to
       // the result — the result object itself stays untouched.
-      pending.resolve({ result: response.result, methods: response.__methods });
+      pending.resolve({ result: response.result, methods: response.__methods, timing: response.__timing });
     }
   }
 
@@ -1038,14 +1041,33 @@ export class RPCClient implements RPCClientImpl {
    *
    * Internal: not part of the public RPCClient interface.
    */
-  public async callWithMeta<TResponse = any>(subject: string, args: any[] = [], opts?: { discover?: boolean }): Promise<{ result: TResponse; methods?: string[] }> {
-    return this.withNoResponderRetry(() => this._callOnce<TResponse>(subject, args, opts?.discover === true));
+  public async callWithMeta<TResponse = any>(
+    subject: string,
+    args: any[] = [],
+    opts?: { discover?: boolean; timing?: boolean },
+  ): Promise<{ result: TResponse; methods?: string[]; timing?: RPCCallTiming }> {
+    const startedAt = opts?.timing === true ? Date.now() : 0;
+    const { result, methods, timing } = await this.withNoResponderRetry(() => this._callOnce<TResponse>(subject, args, opts?.discover === true, opts?.timing === true));
+    // no stamps back means the responder does not know __timing: reporting a
+    // round trip as pure transport would be worse than reporting nothing
+    if (!startedAt || !timing) return { result, methods };
+
+    const totalMs = Date.now() - startedAt;
+    // both stamps come from the responder's clock, so the difference holds
+    // even when the two processes disagree about the time of day
+    const handlerMs = Math.max(0, timing.end - timing.start);
+    return { result, methods, timing: { totalMs, handlerMs, transportMs: Math.max(0, totalMs - handlerMs) } };
   }
 
   /**
    * Make an RPC call (single attempt)
    */
-  private async _callOnce<TResponse = any>(subject: string, args: any[], discover = false): Promise<{ result: TResponse; methods?: string[] }> {
+  private async _callOnce<TResponse = any>(
+    subject: string,
+    args: any[],
+    discover = false,
+    timing = false,
+  ): Promise<{ result: TResponse; methods?: string[]; timing?: RPCTiming }> {
     if (!this.isConnected && !this.isClosed) {
       await this.connect();
     }
@@ -1073,7 +1095,7 @@ export class RPCClient implements RPCClientImpl {
     // the muxed reply inbox (`rpc.reply.<replyPrefix>.>`) catches it.
     const replySubject = `rpc.reply.${id}`;
 
-    return new Promise<{ result: TResponse; methods?: string[] }>((resolve, reject) => {
+    return new Promise<{ result: TResponse; methods?: string[]; timing?: RPCTiming }>((resolve, reject) => {
       // No per-call subscriptions: responses (plain or chunked) and
       // no-responder statuses all arrive on the muxed reply inbox, which
       // routes them back here via pendingRequests. cleanup only has to drop
@@ -1103,6 +1125,9 @@ export class RPCClient implements RPCClientImpl {
         // Envelope marker (never in params — must not leak into handler
         // args): ask the responder for its __methods list.
         message.__discover = true;
+      }
+      if (timing) {
+        message.__timing = true;
       }
       this.publish(subject, message, { reply: replySubject }).catch((error) => {
         if (this.pendingRequests.delete(id)) {
@@ -1185,7 +1210,7 @@ export class RPCClient implements RPCClientImpl {
             } else {
               // __methods (proxy method discovery) travels as a side channel
               // next to the result — the result object itself stays untouched.
-              pending.resolve({ result: response.result, methods: response.__methods });
+              pending.resolve({ result: response.result, methods: response.__methods, timing: response.__timing });
             }
           }
         }
@@ -2170,7 +2195,12 @@ export class RPCClient implements RPCClientImpl {
               await client.publish(replySubject, response);
             } else {
               // Normal RPC call
+              const wantsTiming = msg.__timing === true;
+              const start = wantsTiming ? Date.now() : 0;
               const result = await handleNormalRPC(handler, msg.params);
+              if (wantsTiming) {
+                response.__timing = { start, end: Date.now() };
+              }
               response.result = result;
 
               // Send response
@@ -2360,10 +2390,10 @@ export class RPCClient implements RPCClientImpl {
    * @param options - Optional configuration
    */
   public createProxy<T extends object>(namespace: string): Promisify<T>;
-  public createProxy<T extends object>(namespace: string, options: { isolatedConnection: false }): Promisify<T>;
+  public createProxy<T extends object>(namespace: string, options: { isolatedConnection?: false; onTiming?: ProxyTimingReporter }): Promisify<T>;
   public createProxy<T extends object>(
     namespace: string,
-    options: { isolatedConnection: true },
+    options: { isolatedConnection: true; onTiming?: ProxyTimingReporter },
   ): {
     proxy: Promisify<T>;
     close: () => Promise<void>;
@@ -2371,7 +2401,7 @@ export class RPCClient implements RPCClientImpl {
   // prettier-ignore
   public createProxy<T extends object>(
     namespace: string,
-    options?: { isolatedConnection?: boolean },
+    options?: { isolatedConnection?: boolean; onTiming?: ProxyTimingReporter },
   ):
     | {
       proxy: Promisify<T>;
@@ -2393,7 +2423,7 @@ export class RPCClient implements RPCClientImpl {
       client = this;
     }
 
-    const proxy = createProxy<T>(client, namespace);
+    const proxy = createProxy<T>(client, namespace, [], null, options?.onTiming);
 
     if (options?.isolatedConnection) {
       // Store reference for potential cleanup

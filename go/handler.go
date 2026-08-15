@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 	"unicode"
 )
 
@@ -183,7 +184,14 @@ func (c *Client) RegisterHandler(namespace string, handler any, opts ...HandlerO
 			}
 
 			// Normal RPC call
+			var start int64
+			if msg.Timing {
+				start = time.Now().UnixMilli()
+			}
 			result, err := callHandler(fnCopy, msg.Params)
+			if msg.Timing {
+				response.Timing = &RPCTiming{Start: start, End: time.Now().UnixMilli()}
+			}
 			if err != nil {
 				setError(err)
 			} else {

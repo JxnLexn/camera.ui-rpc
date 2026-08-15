@@ -40,7 +40,7 @@ export interface RPCClient {
   channel(channelId: string, options?: { isolatedConnection?: boolean }): Promise<Channel>;
   privateChannel(channelId: string, targetClientId: string, options?: { isolatedConnection?: boolean }): Promise<PrivateChannel>;
   createProxy<T extends object>(namespace: string): Promisify<T>;
-  createProxy<T extends object>(namespace: string, options: { isolatedConnection: false }): Promisify<T>;
+  createProxy<T extends object>(namespace: string, options: { isolatedConnection?: false; onTiming?: ProxyTimingReporter }): Promisify<T>;
   createProxy<T extends object>(
     namespace: string,
     options: { isolatedConnection: true },
@@ -186,6 +186,14 @@ export interface RPCMessage<T = any> {
    * ignore it.
    */
   __discover?: boolean;
+
+  /**
+   * Timing request (internal metadata). When true, the responder stamps the
+   * clock right before and right after the handler runs and returns both in
+   * `__timing`. Lives on the envelope so it never reaches handler arguments;
+   * old responders ignore it and the caller simply sees no timing back.
+   */
+  __timing?: boolean;
 }
 
 /**
@@ -203,6 +211,37 @@ export interface RPCResponse<T = any> {
 
   /** Available methods on namespace (internal metadata for proxy) */
   __methods?: string[];
+
+  /**
+   * Responder-side clock around the handler, in epoch milliseconds, only when
+   * the request asked for it. Both stamps come from the same clock, so their
+   * difference is free of any offset against the caller's clock.
+   */
+  __timing?: RPCTiming;
+}
+
+/** Responder clock stamps around a handler invocation. */
+export interface RPCTiming {
+  /** Right before the handler is invoked */
+  start: number;
+
+  /** Right after the handler returned */
+  end: number;
+}
+
+/** Receives what every call of a timed proxy cost. */
+export type ProxyTimingReporter = (method: string, timing: RPCCallTiming) => void;
+
+/** What a timed call cost, split into the responder's share and the rest. */
+export interface RPCCallTiming {
+  /** Round trip measured by the caller */
+  totalMs: number;
+
+  /** Time inside the responder's handler */
+  handlerMs: number;
+
+  /** Round trip minus handler: encode, transport, decode, both ways */
+  transportMs: number;
 }
 
 /**

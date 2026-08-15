@@ -246,6 +246,28 @@ async function runNodeServer() {
       failures++;
     }
 
+    // Timing metadata: the peer stamps its clock around the handler, so a
+    // reported timing proves the responder understands __timing at all
+    try {
+      const seen: { method: string; totalMs: number; handlerMs: number; transportMs: number }[] = [];
+      const timed = server.createProxy<{ getLargeData: () => Promise<any> }>(target, {
+        onTiming: (method, timing) => seen.push({ method, ...timing }),
+      });
+      await timed.getLargeData();
+
+      const measured = seen[0];
+      const valid = measured?.method === 'getLargeData' && measured.handlerMs >= 0 && measured.totalMs >= measured.handlerMs && measured.transportMs >= 0;
+      if (valid) {
+        console.log(`${target} timing metadata: PASSED (total=${measured.totalMs}ms handler=${measured.handlerMs}ms transport=${measured.transportMs}ms)`);
+      } else {
+        console.error(`${target} timing metadata: FAILED (${JSON.stringify(seen)})`);
+        failures++;
+      }
+    } catch (error) {
+      console.error(`${target} timing metadata: FAILED`, error);
+      failures++;
+    }
+
     // Error propagation: the peer handler throws; it must reach us as a
     // rejected call carrying the same message, not a silent success.
     const errToken = `boom node->${target}`;

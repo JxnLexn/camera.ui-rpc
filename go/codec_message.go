@@ -372,7 +372,6 @@ func buildStructMeta(t reflect.Type, visiting map[reflect.Type]bool) *structMeta
 	var pending []pendingField
 
 	for f := range t.Fields() {
-		f := f
 		tag := tagparser.Parse(f.Tag.Get("msgpack"))
 		if tag.Name == "-" {
 			continue
@@ -550,7 +549,6 @@ func computeCanContainBinary(t reflect.Type, visiting map[reflect.Type]bool) boo
 		visiting[t] = true
 		defer delete(visiting, t)
 		for f := range t.Fields() {
-			f := f
 			if f.PkgPath != "" && !f.Anonymous {
 				continue
 			}
